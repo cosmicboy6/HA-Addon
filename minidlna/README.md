@@ -103,6 +103,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+[https://buymeacoffee.com/hanshauberger](https://buymeacoffee.com/hanshauberger)
+          
+
+
 [commits-shield]: https://img.shields.io/github/commit-activity/y/bvlaicu/addon-minidlna.svg
 [commits]: https://github.com/bvlaicu/home-assistant-addons/commits/master
 [contributors]: https://github.com/bvlaicu/home-assistant-addons/graphs/contributors
