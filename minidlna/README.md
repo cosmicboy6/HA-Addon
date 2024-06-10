@@ -104,7 +104,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 [https://buymeacoffee.com/hanshauberger](https://buymeacoffee.com/hanshauberger)
-          
+![screenshot](bmc_qr)
 
 
 [commits-shield]: https://img.shields.io/github/commit-activity/y/bvlaicu/addon-minidlna.svg
