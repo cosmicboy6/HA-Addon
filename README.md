@@ -13,7 +13,7 @@ In the Home Assistant add-on store, a possibility to add a repository is provide
 Use the following URL to add this repository:
 
 ```txt
-[https://github.com/cosmicboy6/HA-Addon
+[https://github.com/cosmicboy6/HA-Addon]
 ```
 
 ## Add-ons provided by this repository
