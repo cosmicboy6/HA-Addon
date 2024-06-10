@@ -22,7 +22,7 @@ https://github.com/cosmicboy6/HA-Addon
 
 ## Releases
 
-Nr. 1
+Nr. 1 ADD /media DIR
 
 ## Support
 
@@ -64,6 +64,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-This is a clone of:
+Authors 
+The original setup of this repository is by Bogdan Vlaicu.
 [addon-minidlna]: https://github.com/bvlaicu/home-assistant-addons/tree/master/minidlna
 
