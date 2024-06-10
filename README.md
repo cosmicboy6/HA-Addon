@@ -20,10 +20,6 @@ https://github.com/cosmicboy6/HA-Addon
 
 
 
-### [MiniDLNA][addon-minidlna]
-MiniDLNA server serving web content from the /data persistent volume
-
-
 ## Releases
 
 Nr. 1
@@ -68,9 +64,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-[addon-dashcast]: https://github.com/bvlaicu/home-assistant-addons/tree/master/dashcast
-[addon-meter-reader]: https://github.com/bvlaicu/home-assistant-addons/tree/master/meter-reader
+This is a clone of:
 [addon-minidlna]: https://github.com/bvlaicu/home-assistant-addons/tree/master/minidlna
-[addon-rtlamr]: https://github.com/bvlaicu/home-assistant-addons/tree/master/rtlamr
-[addon-oru]: https://github.com/bvlaicu/home-assistant-addons/tree/master/oru
-[addon-php]: https://github.com/bvlaicu/home-assistant-addons/tree/master/php
+
