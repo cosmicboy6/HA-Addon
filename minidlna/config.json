@@ -2,8 +2,8 @@
   "name": "MiniDLNA",
   "version": "0.1.16",
   "slug": "minidlna",
-  "description": "MiniDLNA daemon serves media files (music, pictures, and video) to clients on a network",
-  "url": "https://github.com/bvlaicu/home-assistant-addons/tree/master/minidlna",
+  "description": "MiniDLNA daemon serves MP3 files to clients on a network",
+  "url": "https://github.com/cosmicboy6/HA-Addon/tree/master/minidlna",
   "arch": ["aarch64", "amd64", "armhf", "armv7", "i386"],
   "startup": "services",
   "homeassistant": "0.92.0b2",
@@ -23,7 +23,7 @@
       },
       {
         "name": "MINIDLNA_friendly_name",
-        "value": "Photos"
+        "value": "Home Assistant DLNA
       },
       {
         "name": "MINIDLNA_media_dir",
