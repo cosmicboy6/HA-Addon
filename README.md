@@ -13,34 +13,20 @@ In the Home Assistant add-on store, a possibility to add a repository is provide
 Use the following URL to add this repository:
 
 ```txt
-https://github.com/bvlaicu/home-assistant-addons
+[https://github.com/cosmicboy6/HA-Addon
 ```
 
 ## Add-ons provided by this repository
 
 
-### [Dashcast][addon-dashcast]
-Display dashboard web pages on your Chromecast device
-### [Meter Reader][addon-meter-reader]
-Put a webcam in front of your utility meter and AWS Rekognition sends the reading over MQTT to a MQTT server of your choice
+
 ### [MiniDLNA][addon-minidlna]
 MiniDLNA server serving web content from the /data persistent volume
-### [RTLAMR][addon-rtlamr]
-Listen for 433MHz RF transmissions of utility meterss and publish the data via MQTT
-### [Oru][addon-oru]
-Retrieving the last meter read from Orange and Rockland Utility or ConEdison and publish the data via MQTT
-### [PHP][addon-php]
-PHP server serving web content from the /data persistent volume
+
 
 ## Releases
 
-Releases are based on [Semantic Versioning][semver], and use the format
-of ``MAJOR.MINOR.PATCH``. In a nutshell, the version will be incremented
-based on the following:
-
-- ``MAJOR``: Incompatible or major changes.
-- ``MINOR``: Backwards-compatible new features and enhancements.
-- ``PATCH``: Backwards-compatible bugfixes and package updates.
+Nr. 1
 
 ## Support
 
@@ -61,7 +47,7 @@ on the correct GitHub repository matching the add-on.
 
 MIT License
 
-Copyright (c) 2019-2020 Bogdan Vlaicu
+Copyright (c) 2024 Hans HAUBERGER
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
