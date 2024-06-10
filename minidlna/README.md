@@ -43,17 +43,11 @@ you are troubleshooting.
 
 ## Changelog & Releases
 
-This repository keeps a change log using [GitHub's releases][releases]
-functionality. The format of the log is based on
-[Keep a Changelog][keepchangelog].
 
-Releases are based on [Semantic Versioning][semver], and use the format
-of ``MAJOR.MINOR.PATCH``. In a nutshell, the version will be incremented
-based on the following:
 
-- ``MAJOR``: Incompatible or major changes.
-- ``MINOR``: Backwards-compatible new features and enhancements.
-- ``PATCH``: Backwards-compatible bugfixes and package updates.
+ADD /media DIR
+
+
 
 ## Support
 
@@ -89,7 +83,7 @@ The original setup of this repository is by [Bogdan Vlaicu][bvlaicu].
 
 MIT License
 
-Copyright (c) 2019-2020 Bogdan Vlaicu
+Copyright (c) 2024 Hans HAUBERGER
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
