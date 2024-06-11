@@ -16,6 +16,11 @@ Use the following URL to add this repository:
 https://github.com/cosmicboy6/HA-Addon
 ```
 
+<a href="https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fcosmicboy6%2FHA-Addon" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg" alt="Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled." /></a>
+
+
+
+
 ## Add-ons provided by this repository
 
 
