@@ -1,5 +1,0 @@
-pyotp
-requests
-pyppeteer
-paho-mqtt
-coned == 0.4.0
