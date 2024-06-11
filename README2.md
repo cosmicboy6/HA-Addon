@@ -20,7 +20,8 @@ https://github.com/bvlaicu/home-assistant-addons
 
 
 
-### [MiniDLNA][addon-minidlna]
+
+### {MiniDLNA] [https://github.com/cosmicboy6/HA-Addon/minidlna]
 MiniDLNA server serving web content from the /data persistent volume
 
 ## Releases
