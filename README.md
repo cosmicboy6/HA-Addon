@@ -23,7 +23,7 @@ https://github.com/cosmicboy6/HA-Addon
 
 ## Add-ons provided by this repository
 
-### [MiniDLNA][minidlna]
+### [https://github.com/cosmicboy6/HA-Addon/tree/main/minidlna]
 MiniDLNA server serving MP3 from /Media /share volume
 
 ## Releases
