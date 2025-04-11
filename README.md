@@ -30,6 +30,12 @@ MiniDLNA server serving MP3 from /Media /share volume
 
 Nr. 1 ADD /media DIR
 
+
+[mymediaalexa][addon-mymediaalexa]
+https://www.mymediaalexa.com/#section-1
+
+My Media for Alexa installs a tiny media server on HOME ASSISTANT that integrates with the ease and power of Amazon Alexa to give you voice control over your media collection. My Media lets you stream your music collection to your Amazon Echo or Amazon Dot without having to upload all your music collection to the Cloud. This keeps your music under your control.
+
 ## Support
 
 Got questions?
