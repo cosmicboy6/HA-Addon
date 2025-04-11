@@ -1,0 +1,22 @@
+# https://www.mymediaalexa.com/
+name: "mymediaalexa"
+description: "My Media for ALEXA"
+version: "1.0"
+slug: "My Media for ALEXA"
+url: "https://github.com/cosmicboy6/HA-Addon/tree/main/mymediaforalexa"
+init: false
+arch:
+  - armhf
+  - armv7
+  - aarch64
+  - amd64
+  - i386
+startup: before
+ports:
+  52050-52051/tcp: 52050-52051
+
+map:
+ - type: share
+   read_only: False
+   path: /media
+image: bizmodeller/mymediaforalexa
