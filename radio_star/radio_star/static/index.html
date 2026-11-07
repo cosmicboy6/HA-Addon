@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio-Star</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2L13.9 7.6L19.9 8L15.2 11.7L16.7 17.4L12 14.2L7.3 17.4L8.8 11.7L4.1 8L10.1 7.6Z" fill="#f5c518"/><circle cx="12" cy="12" r="10" stroke="#03a9f4" stroke-width="1.2" fill="none" opacity=".55"/></svg>
+    <span class="brand-name">Radio-Star</span>
+    <span class="brand-sub">Sonos-FM-Aggregator</span>
+  </div>
+  <div class="top-right">
+    <span id="ha-status" class="dot dot-off" title="HA-Status"></span>
+    <span id="ha-version" class="muted"></span>
+    <span id="clock" class="clock"></span>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-tab="timeline" class="active">Timeline</button>
+  <button data-tab="timers">Timer</button>
+  <button data-tab="automations">Automationen</button>
+  <button data-tab="scripts">Skripte</button>
+  <button data-tab="mp3">MP3s</button>
+  <button data-tab="tts">TTS</button>
+</nav>
+
+<main>
+  <section id="tab-timeline" class="tab active"></section>
+  <section id="tab-timers" class="tab"></section>
+  <section id="tab-automations" class="tab"></section>
+  <section id="tab-scripts" class="tab"></section>
+  <section id="tab-mp3" class="tab"></section>
+  <section id="tab-tts" class="tab"></section>
+</main>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

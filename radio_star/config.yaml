@@ -1,0 +1,25 @@
+name: "Radio-Star"
+version: "1.0.0"
+slug: "radio_star"
+description: "Sonos-FM-Aggregator: Timer, Automationen, TTS, MP3-Bibliothek & Timeline"
+url: "https://github.com/cosmicboy6/HA-Addon/tree/main/radio_star"
+arch:
+  - amd64
+  - aarch64
+init: false
+ingress: true
+ingress_port: 8099
+panel_icon: "mdi:radio-tower"
+panel_title: "Radio-Star"
+homeassistant_api: true
+map:
+  - type: homeassistant_config
+    read_only: false
+options:
+  webserver_url: "http://192.168.0.50"
+  mp3_dir: "/audio/tts"
+  player: "media_player.sonos_fm"
+schema:
+  webserver_url: str
+  mp3_dir: str
+  player: str
