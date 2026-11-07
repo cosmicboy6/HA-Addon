@@ -13,7 +13,8 @@ arch:
   - i386
 startup: before
 ports:
-  52050-52051/tcp: 52050-52051
+  52050/tcp: 52050
+  52051/tcp: 52051
 
 map:
  - type: share

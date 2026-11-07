@@ -1,13 +1,13 @@
-ARG ARCH
-FROM ghcr.io/home-assistant/${ARCH}-base-python:latest
+ARG BUILD_ARCH
+FROM ghcr.io/home-assistant/${BUILD_ARCH}-base-python:latest
 
 LABEL \
     org.opencontainers.image.title="Radio-Star" \
     org.opencontainers.image.description="Sonos-FM-Aggregator: Timer, Automationen, TTS, MP3-Bibliothek & Timeline" \
-    org.opencontainers.image.url="https://github.com/cosmicboy/radio-star" \
-    io.hass.arch="${ARCH}" \
-    io.hass.type="addon" \
-    io.hass.version="1.0.0"
+    org.opencontainers.image.url="https://github.com/cosmicboy6/HA-Addon/tree/main/radio_star" \
+    io.hass.arch="${BUILD_ARCH}" \
+    io.hass.type="app" \
+    io.hass.version="${BUILD_VERSION:-1.0.0}"
 
 RUN pip install --no-cache-dir pyyaml
 
