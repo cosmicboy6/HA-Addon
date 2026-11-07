@@ -1,5 +1,5 @@
 name: "Radio-Star"
-version: "1.0.1"
+version: "1.0.2"
 slug: "radio_star"
 description: "Sonos-FM-Aggregator: Timer, Automationen, TTS, MP3-Bibliothek & Timeline"
 url: "https://github.com/cosmicboy6/HA-Addon/tree/main/radio_star"

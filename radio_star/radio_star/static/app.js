@@ -25,13 +25,19 @@ function toast(msg, err = false) {
   t._h = setTimeout(() => (t.className = ""), 3500);
 }
 
+const API_BASE = (() => {
+  const p = location.pathname;
+  const dir = p.slice(0, p.lastIndexOf("/") + 1);
+  return dir.endsWith("/") ? dir : dir + "/";
+})();
+
 async function api(path, method = "GET", body) {
   const opt = { method, headers: {} };
   if (body !== undefined) {
     opt.headers["Content-Type"] = "application/json";
     opt.body = JSON.stringify(body);
   }
-  const r = await fetch(path, opt);
+  const r = await fetch(API_BASE + path.replace(/^\/+/, ""), opt);
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
   return data;
