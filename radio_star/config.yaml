@@ -1,8 +1,8 @@
 name: "Radio-Star"
-version: "1.0.2"
+version: "1.0.0"
 slug: "radio_star"
 description: "Sonos-FM-Aggregator: Timer, Automationen, TTS, MP3-Bibliothek & Timeline"
-url: "https://github.com/cosmicboy6/HA-Addon/tree/main/radio_star"
+url: "https://github.com/cosmicboy/radio-star"
 arch:
   - amd64
   - aarch64
@@ -19,7 +19,11 @@ options:
   webserver_url: "http://192.168.0.50"
   mp3_dir: "/audio/tts"
   player: "media_player.sonos_fm"
+  scripts_dirs: "."
+  scripts_exclude: "cam4_checker.py,settings.py,papermerge.conf.py,whatsapp_opencode_bridge.py,mymediaforalexa2.py"
 schema:
   webserver_url: str
   mp3_dir: str
   player: str
+  scripts_dirs: str
+  scripts_exclude: str

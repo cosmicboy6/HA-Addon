@@ -40,6 +40,8 @@ DEFAULT_OPTS = {
     "webserver_url": "http://192.168.0.50",
     "mp3_dir": "/audio/tts",
     "player": "media_player.sonos_fm",
+    "scripts_dirs": ".",
+    "scripts_exclude": "cam4_checker.py,settings.py,papermerge.conf.py,whatsapp_opencode_bridge.py,mymediaforalexa2.py",
 }
 
 # ---------------------------------------------------------------------------
@@ -58,6 +60,8 @@ def load_options():
         ("webserver_url", "RADIO_STAR_WEB"),
         ("mp3_dir", "RADIO_STAR_MP3DIR"),
         ("player", "RADIO_STAR_PLAYER"),
+        ("scripts_dirs", "RADIO_STAR_SCRIPT_DIRS"),
+        ("scripts_exclude", "RADIO_STAR_SCRIPT_EXCLUDE"),
     ):
         val = os.environ.get(env)
         if val:
@@ -223,30 +227,43 @@ def list_py_scripts():
     base = config_dir()
     if base is None:
         return []
-    out = []
+    exclude = {n.strip() for n in OPTS.get("scripts_exclude", "").split(",") if n.strip()}
     skip_dirs = {"__pycache__", ".git", "deps", "backups"}
-    for root, dirs, files in os.walk(base):
-        rp = Path(root).relative_to(base)
-        depth = 0 if str(rp) == "." else len(rp.parts)
-        if depth >= 2:
-            dirs[:] = []
+    out = []
+    seen_dirs = set()
+    seen_files = set()
+    for entry in OPTS.get("scripts_dirs", ".").split(","):
+        d = entry.strip().strip("/")
+        if not d or d in seen_dirs:
             continue
-        dirs[:] = [d for d in dirs if d not in skip_dirs and not d.startswith(".")]
-        for f in files:
-            if f.endswith(".py") and not f.startswith("."):
-                fp = Path(root) / f
-                try:
-                    st = fp.stat()
-                    rel = str(fp.relative_to(base))
-                    out.append(
-                        {
-                            "path": rel,
-                            "size": st.st_size,
-                            "mtime": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
-                        }
-                    )
-                except OSError:
-                    continue
+        seen_dirs.add(d)
+        root0 = base if d == "." else base / d
+        if not root0.is_dir():
+            continue
+        top_only = d == "."
+        for root, dirs, files in os.walk(root0):
+            if top_only:
+                dirs[:] = []
+            else:
+                dirs[:] = [x for x in dirs if x not in skip_dirs and not x.startswith(".")]
+            for f in files:
+                if f.endswith(".py") and not f.startswith(".") and f not in exclude:
+                    fp = Path(root) / f
+                    try:
+                        st = fp.stat()
+                        rel = str(fp.relative_to(base))
+                        if rel in seen_files:
+                            continue
+                        seen_files.add(rel)
+                        out.append(
+                            {
+                                "path": rel,
+                                "size": st.st_size,
+                                "mtime": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
+                            }
+                        )
+                    except OSError:
+                        continue
     out.sort(key=lambda x: x["path"].lower())
     return out
 
