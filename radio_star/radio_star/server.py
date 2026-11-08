@@ -10,8 +10,10 @@ import os
 import re
 import shutil
 import ssl
+import sys
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -26,8 +28,12 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.4"
 STARTED = datetime.now()
+
+
+def log(msg):
+    print(f"[radio-star {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", flush=True)
 
 DATA_DIR = Path(os.environ.get("RADIO_STAR_DATA", "/data"))
 TIMERS_FILE = DATA_DIR / "timers.json"
@@ -1201,23 +1207,59 @@ class Handler(BaseHTTPRequestHandler):
             elif path in ("/app.js", "/style.css", "/icon.svg"):
                 self._send_file(STATIC_DIR / path.lstrip("/"))
             else:
+                log(f"404: {method} {path} von {self.client_address[0]}")
                 self._send_json({"error": "not found"}, 404)
         except ApiError as e:
+            log(f"API {method} {path}: HTTP {e.status} {e.message}")
             self._send_json({"error": e.message}, e.status)
         except HAError as e:
+            log(f"HA-Fehler {method} {path}: {e}")
             self._send_json({"error": str(e)}, 502)
         except Exception as e:  # noqa: BLE001
+            log(f"Interner Fehler {method} {path}: {e}")
+            traceback.print_exc()
             self._send_json({"error": f"Interner Fehler: {e}"}, 500)
 
 
+def token_source():
+    for name in ("HA_API_TOKEN", "HA_TOKEN", "SUPERVISOR_TOKEN"):
+        if os.environ.get(name):
+            return name
+    return "keiner"
+
+
 def main():
-    port = int(os.environ.get("PORT", os.environ.get("RADIO_STAR_PORT", "8099")))
-    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
-    print(f"[radio-star] v{APP_VERSION} laeuft auf Port {port}")
-    print(f"[radio-star] HA: {HA_CLIENT.base}")
-    print(f"[radio-star] Webserver: {OPTS['webserver_url']}{OPTS['mp3_dir']}")
-    print(f"[radio-star] Config-Dir: {config_dir()}")
-    server.serve_forever()
+    try:
+        port = int(os.environ.get("PORT", os.environ.get("RADIO_STAR_PORT", "8099")))
+        log(f"v{APP_VERSION} start, Python {sys.version.split()[0]}, Port {port}")
+        for k, v in sorted(OPTS.items()):
+            log(f"Option {k}: {v}")
+        log(f"Data-Dir: {DATA_DIR} (vorhanden: {DATA_DIR.is_dir()})")
+        log(f"Timers-File: {TIMERS_FILE} (vorhanden: {TIMERS_FILE.is_file()})")
+        log(f"Config-Dir: {config_dir()}")
+        log(f"Static-Dir: {STATIC_DIR} (vorhanden: {STATIC_DIR.is_dir()})")
+        log(f"HA-Client: {HA_CLIENT.base}, Token aus: {token_source()}")
+        try:
+            code, ver = HA_CLIENT._req("GET", "/config", timeout=10)
+            if code == 200 and isinstance(ver, dict):
+                log(f"HA-Verbindung OK: HA {ver.get('version')}, HAOS {ver.get('haos')}, Supervisor {ver.get('supervisor')}")
+            else:
+                log(f"HA-Verbindung FEHLER: HTTP {code}: {str(ver)[:200]}")
+        except Exception as e:
+            log(f"HA-Verbindung FEHLER: {e}")
+        try:
+            server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+        except OSError as e:
+            log(f"FEHLER: Port {port} nicht bindbar: {e}")
+            raise
+        log(f"Webs laeuft auf 0.0.0.0:{port}")
+        server.serve_forever()
+    except SystemExit:
+        raise
+    except Exception:
+        log("FEHLER beim Start (Stacktrace):")
+        traceback.print_exc()
+        raise
 
 
 if __name__ == "__main__":
