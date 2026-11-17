@@ -1,0 +1,130 @@
+# HP LaserJet 1010 -> ESP32-S3 raw TCP-9100 print server
+#
+# Board: Espressif ESP32-S3-DevKitC-1-N16R8V (16 MB Flash Quad, 8 MB PSRAM Octal)
+#
+# The printer is a host-based HP LaserJet 1010 (USB only, no network port).
+# The client driver renders the job and sends the ready-to-print PCL XL stream
+# to TCP port 9100; this component forwards it verbatim to the printer's USB
+# bulk OUT endpoint.
+#
+# Copy secrets.yaml.example to secrets.yaml and fill in your own values.
+
+esphome:
+  name: hp1010-printserver
+  friendly_name: HP1010 Print Server
+  comment: ESP32-S3 USB-host raw-9100 bridge for the HP LaserJet 1010
+  platformio_options:
+    build_flags:
+      - -DCONFIG_USB_HOST_CONTROL_TRANSFER_MAX_SIZE=1024
+      - -DCONFIG_USB_HOST_HW_BUFFER_BIAS_BALANCED=1
+
+esp32:
+  variant: esp32s3
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_USB_HOST_HW_BUFFER_BIAS_BALANCED: "y"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  hardware_uart: UART0
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: !secret ap_ssid
+    password: !secret ap_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+
+external_components:
+  - source:
+      type: local
+      path: external_components
+
+usb_host:
+  max_transfer_requests: 32
+
+hp1010_printserver:
+  id: prn
+  port: 9100
+  vid: 0x03F0
+  pid: 0x0C17
+
+binary_sensor:
+  - platform: template
+    name: "HP1010 Printer Ready"
+    lambda: 'return id(prn).is_ready();'
+  - platform: template
+    name: "HP1010 Paper Out"
+    device_class: problem
+    lambda: 'return id(prn).is_paper_empty();'
+  - platform: template
+    name: "HP1010 Error"
+    device_class: problem
+    lambda: 'return id(prn).is_error();'
+  - platform: template
+    name: "HP1010 Online"
+    lambda: 'return id(prn).is_online();'
+
+sensor:
+  - platform: template
+    name: "HP1010 Raw Status"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: 'return id(prn).has_status() ? (float) id(prn).printer_status() : NAN;'
+  - platform: template
+    name: "HP1010 Page Count"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 60s
+    lambda: 'return id(prn).has_page_count() ? (float) id(prn).page_count() : NAN;'
+  - platform: uptime
+    name: "HP1010 Uptime"
+    entity_category: diagnostic
+  - platform: wifi_signal
+    name: "HP1010 WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: debug
+    free:
+      name: "HP1010 Free Heap"
+    fragmentation:
+      name: "HP1010 Heap Fragmentation"
+    block:
+      name: "HP1010 Max Free Block"
+    loop_time:
+      name: "HP1010 Loop Time"
+
+text_sensor:
+  - platform: version
+    name: "HP1010 Firmware Version"
+  - platform: wifi_info
+    ip_address:
+      name: "HP1010 IP Address"
+    ssid:
+      name: "HP1010 WiFi SSID"
+    bssid:
+      name: "HP1010 WiFi BSSID"
+    mac_address:
+      name: "HP1010 MAC Address"
+
+debug:
+  update_interval: 60s

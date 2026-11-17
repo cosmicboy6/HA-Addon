@@ -23,6 +23,10 @@ https://github.com/cosmicboy6/HA-Addon
 
 ## Add-ons provided by this repository
 
+### [HP1010 Print Server Installer](https://github.com/cosmicboy6/HA-Addon/tree/main/hp1010_installer)
+Build and flash the ESP32-S3 firmware for the HP LaserJet 1010 raw-9100 print
+server, over USB, directly from Home Assistant.
+
 ### [https://github.com/cosmicboy6/HA-Addon/tree/main/minidlna]
 MiniDLNA server serving MP3 from /Media /share volume
 
