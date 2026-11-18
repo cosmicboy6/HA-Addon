@@ -40,3 +40,15 @@ It also ships the prebuilt, no-secrets `firmware.factory.bin`, so you can do a
 - The build cache (`/data/platformio`, `/data/idf`, `/data/project/.esphome`)
   lives on the persistent volume, so restarts and updates do not re-download.
 - Pinned to ESPHome `2026.10.2`, matching the published firmware.
+
+## Credits
+
+- Built with **[OpenCode](https://opencode.ai)**, running in the
+  [`sprisa/opencode`](https://hub.docker.com/r/sprisa/opencode) Docker image
+  (source: [`sprisa/opencode-server`](https://github.com/sprisa/opencode-server)):
+
+  ```sh
+  docker pull sprisa/opencode:latest
+  ```
+
+- Built by **Big Pickle GO** 🥒
