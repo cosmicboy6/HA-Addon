@@ -32,7 +32,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 DATA_DIR = Path(os.environ.get("HP1010_INSTALLER_DATA", "/data"))
 SETTINGS_FILE = DATA_DIR / "settings.json"

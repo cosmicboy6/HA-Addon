@@ -115,15 +115,22 @@ async function pollLog() {
 }
 
 async function action(id, path, extra) {
-  const msg = $(id + "-msg");
-  msg.textContent = "working…";
+  const msg = $(id + "-msg") || $("job-msg");
+  const setMsg = (t) => { if (msg) msg.textContent = t; };
+  setMsg("working…");
   try {
     const body = Object.assign(formValues(), extra || {});
+    // Flashing needs a serial port; fail fast with a clear message instead of
+    // letting the backend reject it (or silently doing nothing).
+    if ((path === "api/flash" || path === "api/quickflash") && !body.device_port) {
+      setMsg("no serial port selected — plug in the board and press Refresh");
+      return;
+    }
     const r = await api(path, "POST", body);
-    msg.textContent = r.ok ? "started — see the log below" : (r.error || "failed");
+    setMsg(r.ok ? "started — see the log below" : (r.error || "failed"));
     await refreshStatus();
   } catch (e) {
-    msg.textContent = e.message;
+    setMsg(e.message);
   }
 }
 
