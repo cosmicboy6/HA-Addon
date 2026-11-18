@@ -1,0 +1,150 @@
+# DYMO LabelWriter 450 -> ESP32-S3 raw TCP-9100 print server
+#
+# Board: Espressif ESP32-S3-DevKitC-1-N16R8V (16 MB Flash Quad, 8 MB PSRAM Octal)
+#
+# The LabelWriter 450 is a standard USB Printer Class device (VID 0x0922,
+# PID 0x0020) with no network port. The client renders the label and sends the
+# ready-to-print DYMO ESC raster stream to TCP port 9100; this component forwards
+# it verbatim to the printer's USB bulk OUT endpoint.
+#
+# The ESP32 advertises itself over mDNS as a "DYMO LabelWriter 450" raw printer
+# (_pdl-datastream._tcp, port 9100) so Bonjour-aware clients can find it, and it
+# answers on the same socket://<host>:9100 endpoint DYMO's own print server uses.
+#
+# Copy secrets.yaml.example to secrets.yaml and fill in your own values.
+
+esphome:
+  name: dymo-labelwriter-450
+  friendly_name: DYMO LabelWriter 450
+  comment: ESP32-S3 USB-host raw-9100 bridge for the DYMO LabelWriter 450
+  platformio_options:
+    build_flags:
+      - -DCONFIG_USB_HOST_CONTROL_TRANSFER_MAX_SIZE=1024
+      - -DCONFIG_USB_HOST_HW_BUFFER_BIAS_BALANCED=1
+
+esp32:
+  variant: esp32s3
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_USB_HOST_HW_BUFFER_BIAS_BALANCED: "y"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  hardware_uart: UART0
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: !secret ap_ssid
+    password: !secret ap_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+
+# Advertise the bridge as a DYMO LabelWriter 450 raw (Port 9100) printer. The
+# TXT records are the CUPS/Bonjour conventions CUPS and macOS read to label the
+# queue ("ty" = make and model, usb_MFG/usb_MDL = USB identity).
+mdns:
+  services:
+    - service: _pdl-datastream
+      protocol: _tcp
+      port: 9100
+      txt:
+        txtvers: "1"
+        ty: "DYMO LabelWriter 450"
+        usb_MFG: "DYMO"
+        usb_MDL: "LabelWriter 450"
+        product: "(DYMO LabelWriter 450)"
+        note: "ESP32-S3 DYMO LabelWriter 450 network bridge"
+        adminurl: "http://dymo-labelwriter-450.local/"
+
+external_components:
+  - source:
+      type: local
+      path: external_components
+
+usb_host:
+  max_transfer_requests: 32
+
+hp1010_printserver:
+  id: prn
+  port: 9100
+  vid: 0x0922
+  pid: 0x0020
+  # The LabelWriter has no PJL; a page-count query would corrupt the raster
+  # stream, so it must stay disabled.
+  page_count: false
+  # The LabelWriter answers the USB Printer Class GET_PORT_STATUS request.
+  status_polling: true
+
+binary_sensor:
+  - platform: template
+    name: "Printer Ready"
+    lambda: 'return id(prn).is_ready();'
+  - platform: template
+    name: "Paper Out"
+    device_class: problem
+    lambda: 'return id(prn).is_paper_empty();'
+  - platform: template
+    name: "Error"
+    device_class: problem
+    lambda: 'return id(prn).is_error();'
+  - platform: template
+    name: "Online"
+    lambda: 'return id(prn).is_online();'
+
+sensor:
+  - platform: template
+    name: "Raw Status"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: 'return id(prn).has_status() ? (float) id(prn).printer_status() : NAN;'
+  - platform: uptime
+    name: "Uptime"
+    entity_category: diagnostic
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: debug
+    free:
+      name: "Free Heap"
+    fragmentation:
+      name: "Heap Fragmentation"
+    block:
+      name: "Max Free Block"
+    loop_time:
+      name: "Loop Time"
+
+text_sensor:
+  - platform: version
+    name: "Firmware Version"
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "WiFi SSID"
+    bssid:
+      name: "WiFi BSSID"
+    mac_address:
+      name: "MAC Address"
+
+debug:
+  update_interval: 60s

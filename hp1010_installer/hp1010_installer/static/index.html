@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HP1010 Print Server Installer</title>
+<title>Print Server Installer</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
-  <h1>HP1010 Print Server Installer</h1>
-  <p class="muted">Build and flash the ESP32-S3 firmware for the HP LaserJet 1010 print server.</p>
+  <h1>Print Server Installer</h1>
+  <p class="muted">Build and flash the ESP32-S3 raw-9100 print-server firmware for the
+     <strong>HP LaserJet 1010</strong> or the <strong>DYMO LabelWriter 450</strong>.</p>
   <p class="muted small" id="versions"></p>
 </header>
 
@@ -18,6 +19,12 @@
   <p class="muted small">These values are written into the device firmware. Your WiFi password stays on this
      Home Assistant instance (<code>/data</code>) and is never uploaded anywhere.</p>
   <div class="grid">
+    <label class="wide">Printer
+      <select id="printer">
+        <option value="hp1010">HP LaserJet 1010 (USB 03F0:0C17)</option>
+        <option value="dymo">DYMO LabelWriter 450 (USB 0922:0020)</option>
+      </select>
+    </label>
     <label>WiFi SSID
       <input id="wifi_ssid" type="text" autocomplete="off" placeholder="Your 2.4 GHz network">
     </label>
@@ -74,9 +81,9 @@
     <span class="muted small" id="quickflash-msg"></span>
     <button class="danger" id="cancel" type="button" hidden>Cancel job</button>
   </div>
-  <p class="muted small">The bundled prebuilt image needs no build: it boots a
-     <strong>HP1010 Print Fallback</strong> access point so you can set the WiFi later. Use the normal
-     flash once you have built your own firmware.</p>
+  <p class="muted small">The bundled prebuilt image needs no build: it boots a fallback
+     access point so you can set the WiFi later. The image matches the selected
+     <strong>Printer</strong> above. Use the normal flash once you have built your own firmware.</p>
 </section>
 
 <section class="card">
@@ -89,7 +96,7 @@
 </section>
 
 <footer class="muted small">
-  HP1010 Print Server Installer &middot; <span id="app-version"></span>
+  Print Server Installer &middot; <span id="app-version"></span>
 </footer>
 
 <script src="app.js"></script>

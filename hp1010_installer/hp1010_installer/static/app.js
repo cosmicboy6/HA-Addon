@@ -21,7 +21,11 @@ async function api(path, method = "GET", body) {
 }
 
 const $ = (id) => document.getElementById(id);
-const FIELDS = ["wifi_ssid", "wifi_password", "ap_ssid", "ap_password", "api_key", "device_port"];
+const FIELDS = ["printer", "wifi_ssid", "wifi_password", "ap_ssid", "ap_password", "api_key", "device_port"];
+
+// Fallback-AP names the app treats as defaults; when the printer selection
+// changes, an untouched default follows the newly selected printer.
+let apDefaults = { hp1010: "HP1010 Print Fallback", dymo: "DYMO Print Fallback" };
 
 function formValues() {
   const out = {};
@@ -93,8 +97,13 @@ function renderJob(job) {
 async function refreshStatus() {
   try {
     const s = await api("api/status");
+    if (s.printers) {
+      apDefaults = Object.fromEntries(Object.entries(s.printers).map(([k, v]) => [k, v.ap_default]));
+    }
     $("app-version").textContent = "v" + s.app_version;
-    $("versions").textContent = `ESPHome ${s.esphome_version} · ${s.compiled ? "firmware built" : "no build yet"}` +
+    const label = (s.printers && s.printers[s.printer] && s.printers[s.printer].label) || s.printer;
+    $("versions").textContent = `${label} · ESPHome ${s.esphome_version} · ` +
+      (s.compiled ? "firmware built" : "no build yet") +
       (s.prebuilt ? " · prebuilt image available" : "");
     renderPorts(s.ports, s.settings.device_port);
     renderJob(s.job);
@@ -135,6 +144,12 @@ async function action(id, path, extra) {
 }
 
 function wire() {
+  $("printer").onchange = () => {
+    const current = $("ap_ssid").value;
+    if (!current || Object.values(apDefaults).includes(current)) {
+      $("ap_ssid").value = apDefaults[$("printer").value] || current;
+    }
+  };
   $("save").onclick = async () => {
     const msg = $("save-msg");
     msg.textContent = "saving…";
