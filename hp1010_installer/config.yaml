@@ -1,7 +1,7 @@
-name: "Print Server Installer (HP1010 / DYMO 450)"
-version: "1.1.0"
+name: "HP1010 Print Server Installer"
+version: "1.0.1"
 slug: "hp1010_installer"
-description: "Build and flash the ESP32-S3 print-server firmware (HP LaserJet 1010 or DYMO LabelWriter 450) over USB"
+description: "Build and flash the ESP32-S3 HP LaserJet 1010 print-server firmware over USB"
 url: "https://github.com/cosmicboy6/HA-Addon/tree/main/hp1010_installer"
 arch:
   - amd64
@@ -10,7 +10,7 @@ init: false
 ingress: true
 ingress_port: 8099
 panel_icon: "mdi:printer-wireless"
-panel_title: "Print Server Installer"
+panel_title: "HP1010 Installer"
 uart: true
 usb: true
 watchdog: "http://[HOST]:[PORT:8099]/api/health"

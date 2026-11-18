@@ -19,14 +19,10 @@ namespace esphome::hp1010_printserver {
 
 // Transparent raw-9100 (JetDirect/AppSocket) -> USB Printer Class bridge.
 //
-// Works with any standard USB Printer Class (class 0x07) device that accepts a
-// ready-to-print byte stream on its bulk OUT endpoint: the client driver renders
-// the job and sends the bytes to TCP port 9100, and this component forwards them
-// verbatim. It does not interpret PCL/GDI/raster data.
-//
-// Tuned by configuration for the target printer:
-//   * HP LaserJet 1010 (03F0:0C17): PJL page count + IEEE-1284 status polling.
-//   * DYMO LabelWriter 450 (0922:0020): no PJL; status polling optional.
+// The printer is a host-based HP LaserJet 1010: the client driver renders the
+// job and sends the ready-to-print byte stream to TCP port 9100. This component
+// only forwards those bytes to the printer's bulk OUT endpoint; it does not
+// interpret PCL/GDI data.
 class HP1010PrintServer : public usb_host::USBClient {
  public:
   HP1010PrintServer(uint16_t vid, uint16_t pid) : usb_host::USBClient(vid, pid) {}
@@ -36,11 +32,6 @@ class HP1010PrintServer : public usb_host::USBClient {
   void dump_config() override;
 
   void set_port(uint16_t port) { this->port_ = port; }
-  /// Enable/disable the PJL INFO PAGECOUNT query (HP-only; printers without PJL
-  /// must not be sent the query or it corrupts the print stream).
-  void set_page_count_enabled(bool enabled) { this->page_count_enabled_ = enabled; }
-  /// Enable/disable the USB Printer Class GET_PORT_STATUS poll (IEEE-1284 byte).
-  void set_status_polling_enabled(bool enabled) { this->status_polling_enabled_ = enabled; }
 
   /// True while the printer is enumerated, claimed, and selected for raw data.
   bool is_ready() const { return this->printer_ready_.load(std::memory_order_acquire); }
@@ -105,7 +96,6 @@ class HP1010PrintServer : public usb_host::USBClient {
   uint16_t port_{9100};
 
   std::atomic<uint8_t> iface_{0};
-  std::atomic<uint8_t> alt_setting_{0};
   std::atomic<uint8_t> ep_out_{0};
   std::atomic<uint8_t> ep_in_{0};
   std::atomic<bool> claimed_{false};
@@ -115,12 +105,6 @@ class HP1010PrintServer : public usb_host::USBClient {
   std::atomic<bool> has_status_{false};
   std::atomic<uint32_t> page_count_{0};
   std::atomic<bool> has_page_count_{false};
-  // Number of printer-class alternate settings found; > 1 means the interface
-  // must be switched with SET_INTERFACE after claiming.
-  uint8_t alt_count_{0};
-  // Whether to query the HP-specific PJL page count / poll GET_PORT_STATUS.
-  bool page_count_enabled_{true};
-  bool status_polling_enabled_{true};
   // True from a PJL query submit until its reply is parsed (or it times out).
   std::atomic<bool> pjl_waiting_{false};
   // Set by the TCP task while a print job is being received.

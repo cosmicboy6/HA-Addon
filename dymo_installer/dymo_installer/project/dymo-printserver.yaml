@@ -82,14 +82,11 @@ external_components:
 usb_host:
   max_transfer_requests: 32
 
-hp1010_printserver:
+dymo_printserver:
   id: prn
   port: 9100
   vid: 0x0922
   pid: 0x0020
-  # The LabelWriter has no PJL; a page-count query would corrupt the raster
-  # stream, so it must stay disabled.
-  page_count: false
   # The LabelWriter answers the USB Printer Class GET_PORT_STATUS request.
   status_polling: true
 

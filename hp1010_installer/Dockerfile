@@ -3,12 +3,12 @@ ARG BUILD_ARCH
 FROM ghcr.io/home-assistant/base-debian:trixie
 
 LABEL \
-    org.opencontainers.image.title="Print Server Installer" \
-    org.opencontainers.image.description="Build and flash the ESP32-S3 print-server firmware (HP LaserJet 1010 or DYMO LabelWriter 450) over USB" \
+    org.opencontainers.image.title="HP1010 Print Server Installer" \
+    org.opencontainers.image.description="Build and flash the ESP32-S3 HP LaserJet 1010 print-server firmware over USB" \
     org.opencontainers.image.url="https://github.com/cosmicboy6/HA-Addon/tree/main/hp1010_installer" \
     io.hass.arch="${BUILD_ARCH}" \
     io.hass.type="app" \
-    io.hass.version="${BUILD_VERSION:-1.1.0}"
+    io.hass.version="${BUILD_VERSION:-1.0.1}"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1

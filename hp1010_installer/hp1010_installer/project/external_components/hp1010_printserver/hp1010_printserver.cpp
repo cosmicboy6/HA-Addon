@@ -15,10 +15,9 @@ namespace esphome::hp1010_printserver {
 
 static const char *const TAG = "hp1010_printserver";
 
-// USB Printer Class (see usb.org "USB Printer Class Specification"). The
-// standard subclass is 0x01 (Printer), but a few devices report 0x00/0xFF, so
-// only the class is required - the device is already bound by VID/PID.
+// USB Printer Class (see usb.org "USB Printer Class Specification")
 static constexpr uint8_t HP_PRINTER_CLASS = 0x07;
+static constexpr uint8_t HP_PRINTER_SUBCLASS = 0x01;
 
 // Descriptor types and endpoint transfer types from usb_types_ch9.h, spelled
 // out here so the component does not depend on the ESP-IDF macro names.
@@ -67,33 +66,26 @@ void HP1010PrintServer::setup() {
 
   // Poll the printer's USB Printer Class status so a stalled, deselected, or
   // out-of-paper printer is visible; a raw 9100 bridge otherwise never notices.
-  // Not all printers answer GET_PORT_STATUS meaningfully, so it is optional.
-  if (this->status_polling_enabled_) {
-    this->set_interval("printer_status", 15000, [this]() { this->printer_class_port_status_(); });
-  }
+  this->set_interval("printer_status", 15000, [this]() { this->printer_class_port_status_(); });
 
   // Refresh the PJL page count shortly after each job (the TCP task raises
   // page_count_refresh_) and at least every 5 minutes. Runs from the main loop
-  // because set_timeout() inside query_page_count_() is not task-safe. Only the
-  // HP LaserJet speaks PJL; sending the query to another printer would inject
-  // control bytes into its print stream, so such configs set page_count: false.
-  if (this->page_count_enabled_) {
-    this->set_interval("page_count", 10000, [this]() {
-      const bool requested = this->page_count_refresh_.load(std::memory_order_acquire);
-      const uint32_t now = millis();
-      if ((requested || now - this->last_page_count_query_ > 300000) && this->query_page_count_()) {
-        this->page_count_refresh_.store(false, std::memory_order_release);
-        this->last_page_count_query_ = now;
-      }
-    });
-  }
+  // because set_timeout() inside query_page_count_() is not task-safe.
+  this->set_interval("page_count", 10000, [this]() {
+    const bool requested = this->page_count_refresh_.load(std::memory_order_acquire);
+    const uint32_t now = millis();
+    if ((requested || now - this->last_page_count_query_ > 300000) && this->query_page_count_()) {
+      this->page_count_refresh_.store(false, std::memory_order_release);
+      this->last_page_count_query_ = now;
+    }
+  });
 }
 
 void HP1010PrintServer::dump_config() {
-  ESP_LOGCONFIG(TAG, "USB raw-9100 print server:");
+  ESP_LOGCONFIG(TAG, "HP1010 Print Server:");
   ESP_LOGCONFIG(TAG, "  TCP port: %u", this->port_);
   if (this->is_ready()) {
-    ESP_LOGCONFIG(TAG, "  USB interface: %u alt %u", this->iface_.load(), this->alt_setting_.load());
+    ESP_LOGCONFIG(TAG, "  USB interface: %u", this->iface_.load());
     ESP_LOGCONFIG(TAG, "  Bulk OUT: 0x%02X (MPS %u)", this->ep_out_.load(), this->ep_out_mps_);
     if (this->ep_in_.load() != 0)
       ESP_LOGCONFIG(TAG, "  Bulk IN: 0x%02X", this->ep_in_.load());
@@ -106,19 +98,9 @@ void HP1010PrintServer::dump_config() {
   } else {
     ESP_LOGCONFIG(TAG, "  Printer: not connected");
   }
-  ESP_LOGCONFIG(TAG, "  PJL page count: %s", this->page_count_enabled_ ? "enabled" : "disabled");
-  ESP_LOGCONFIG(TAG, "  Status polling: %s", this->status_polling_enabled_ ? "enabled" : "disabled");
   usb_host::USBClient::dump_config();
 }
 
-// Walk the configuration descriptor and pick the best printer-class interface
-// alternate setting that has a bulk OUT endpoint. Printers vary widely:
-//   * HP LaserJet 1010: one interface, three alternates - alt 0 is IEEE 1284.4
-//     packet mode (protocol 3, where raw PCL is parsed as MLC and discarded),
-//     alt 1 bidirectional (protocol 2), alt 2 unidirectional (protocol 1).
-//   * DYMO LabelWriter 450: a single interface/alternate (protocol 2).
-// Preference order is bidirectional > unidirectional > unspecified > 1284.4, so
-// the HP gets its bidirectional setting and the DYMO keeps its only setting.
 bool HP1010PrintServer::find_printer_interface_() {
   const usb_config_desc_t *config_desc;
   if (usb_host_get_active_config_descriptor(this->device_handle_, &config_desc) != ESP_OK) {
@@ -129,51 +111,13 @@ bool HP1010PrintServer::find_printer_interface_() {
   const uint8_t *base = reinterpret_cast<const uint8_t *>(config_desc);
   const size_t total = config_desc->wTotalLength;
 
-  uint8_t best_iface = 0;
-  uint8_t best_alt = 0;
-  uint8_t best_out = 0;
-  uint8_t best_in = 0;
-  uint16_t best_out_mps = 64;
-  uint16_t best_in_mps = 64;
-  int best_score = -1;
-  uint8_t alt_count = 0;
-
-  // Candidate accumulated from one interface descriptor and the endpoints that
-  // follow it, until the next interface descriptor starts a new candidate.
-  bool have_candidate = false;
-  bool candidate_is_printer = false;
-  uint8_t cand_iface = 0;
-  uint8_t cand_alt = 0;
-  uint8_t cand_protocol = 0;
-  uint8_t cand_out = 0;
-  uint8_t cand_in = 0;
-  uint16_t cand_out_mps = 64;
-  uint16_t cand_in_mps = 64;
-
-  auto flush_candidate = [&]() {
-    if (!have_candidate || !candidate_is_printer)
-      return;
-    alt_count++;
-    if (cand_out == 0)
-      return;
-    int score;
-    switch (cand_protocol) {
-      case 2: score = 30; break;  // bidirectional
-      case 1: score = 20; break;  // unidirectional
-      case 0: score = 10; break;  // unspecified
-      case 3: score = 0; break;   // IEEE 1284.4 packet mode
-      default: score = 5; break;
-    }
-    if (score > best_score) {
-      best_score = score;
-      best_iface = cand_iface;
-      best_alt = cand_alt;
-      best_out = cand_out;
-      best_in = cand_in;
-      best_out_mps = cand_out_mps;
-      best_in_mps = cand_in_mps;
-    }
-  };
+  uint8_t found_iface = 0;
+  uint8_t found_out = 0;
+  uint8_t found_in = 0;
+  uint16_t found_out_mps = 64;
+  uint16_t found_in_mps = 64;
+  uint8_t current_iface = 0;
+  bool current_is_printer = false;
 
   size_t offset = 0;
   while (offset + 2 <= total) {
@@ -182,62 +126,51 @@ bool HP1010PrintServer::find_printer_interface_() {
       break;
 
     if (desc->bDescriptorType == HP_DESC_INTERFACE) {
-      flush_candidate();
       const auto *intf = reinterpret_cast<const usb_intf_desc_t *>(desc);
-      have_candidate = true;
-      candidate_is_printer = intf->bInterfaceClass == HP_PRINTER_CLASS;
-      cand_iface = intf->bInterfaceNumber;
-      cand_alt = intf->bAlternateSetting;
-      cand_protocol = intf->bInterfaceProtocol;
-      cand_out = 0;
-      cand_in = 0;
-      cand_out_mps = 64;
-      cand_in_mps = 64;
-      if (candidate_is_printer) {
+      current_iface = intf->bInterfaceNumber;
+      current_is_printer =
+          intf->bInterfaceClass == HP_PRINTER_CLASS && intf->bInterfaceSubClass == HP_PRINTER_SUBCLASS;
+      if (current_is_printer) {
         ESP_LOGD(TAG, "Printer interface %u alt %u, class 0x%02X sub 0x%02X protocol 0x%02X, endpoints %u",
-                 cand_iface, cand_alt, intf->bInterfaceClass, intf->bInterfaceSubClass, intf->bInterfaceProtocol,
-                 intf->bNumEndpoints);
+                 current_iface, intf->bAlternateSetting, intf->bInterfaceClass, intf->bInterfaceSubClass,
+                 intf->bInterfaceProtocol, intf->bNumEndpoints);
       }
-    } else if (desc->bDescriptorType == HP_DESC_ENDPOINT && have_candidate && candidate_is_printer) {
+    } else if (desc->bDescriptorType == HP_DESC_ENDPOINT && current_is_printer) {
       const auto *ep = reinterpret_cast<const usb_ep_desc_t *>(desc);
       if ((ep->bmAttributes & HP_XFER_TYPE_MASK) == HP_XFER_TYPE_BULK) {
         if ((ep->bEndpointAddress & 0x80) != 0) {
-          cand_in = ep->bEndpointAddress;
-          cand_in_mps = ep->wMaxPacketSize;
-        } else if (cand_out == 0) {
-          cand_out = ep->bEndpointAddress;
-          cand_out_mps = ep->wMaxPacketSize;
+          found_in = ep->bEndpointAddress;
+          found_in_mps = ep->wMaxPacketSize;
+        } else if (found_out == 0) {
+          found_out = ep->bEndpointAddress;
+          found_out_mps = ep->wMaxPacketSize;
+          found_iface = current_iface;
         }
       }
     }
     offset += desc->bLength;
   }
-  flush_candidate();
 
-  if (best_score < 0) {
+  if (found_out == 0) {
     ESP_LOGW(TAG, "No bulk OUT endpoint on a printer interface found");
     return false;
   }
 
-  this->iface_.store(best_iface);
-  this->alt_setting_.store(best_alt);
-  this->ep_out_.store(best_out);
-  this->ep_in_.store(best_in);
-  this->ep_out_mps_ = best_out_mps;
-  this->ep_in_mps_ = best_in_mps;
-  this->alt_count_ = alt_count;
-  ESP_LOGI(TAG, "Printer interface %u alt %u selected (bulk OUT 0x%02X, bulk IN 0x%02X, %u alternate setting(s))",
-           best_iface, best_alt, best_out, best_in, alt_count);
+  this->iface_.store(found_iface);
+  this->ep_out_.store(found_out);
+  this->ep_in_.store(found_in);
+  this->ep_out_mps_ = found_out_mps;
+  this->ep_in_mps_ = found_in_mps;
   return true;
 }
 
-// Select the printer's alternate interface setting. The HP LaserJet 1010 powers
-// up on alt 0 (IEEE 1284.4 packet mode, protocol 3), where raw PCL is parsed as
-// MLC packets and silently discarded; the CUPS usb backend deliberately ignores
-// protocol 3 and selects the bidirectional setting, then calls SET_INTERFACE. A
-// printer with a single alternate setting (e.g. the DYMO LabelWriter 450) is
-// already where it needs to be and is left alone. Standard SET_INTERFACE:
-// bmRequestType 0x01, bRequest 0x0B.
+// Select the printer's alternate interface setting. This LaserJet 1010 exposes
+// one interface with three alternate settings: alt 0 = IEEE 1284.4 packet mode
+// (protocol 3), alt 1 = bidirectional (protocol 2), alt 2 = unidirectional
+// (protocol 1). It powers up on alt 0, where raw PCL is parsed as MLC packets
+// and silently discarded. The CUPS usb backend deliberately ignores protocol 3
+// and selects the bidirectional setting, then calls SET_INTERFACE; we do the
+// same. Standard SET_INTERFACE: bmRequestType 0x01, bRequest 0x0B.
 void HP1010PrintServer::select_alt_setting_(uint8_t alt) {
   const uint8_t iface = this->iface_.load();
   const bool ok = this->control_transfer(
@@ -389,12 +322,9 @@ void HP1010PrintServer::on_connected() {
   }
   this->claimed_.store(true);
 
-  // Switch to the alternate setting that actually carries raw print data. Only
-  // needed when the interface offers more than one; single-setting printers are
-  // already on the right one.
-  if (this->alt_count_ > 1) {
-    this->select_alt_setting_(this->alt_setting_.load());
-  }
+  // Leave the 1284.4 (packet-mode) default and switch to the bidirectional
+  // alternate setting, so the printer accepts raw PCL instead of MLC framing.
+  this->select_alt_setting_(1);
 
   // A new connection invalidates anything left over from a previous job.
   this->generation_.fetch_add(1, std::memory_order_acq_rel);
@@ -420,20 +350,16 @@ void HP1010PrintServer::on_connected() {
 
   // Read the printer's status soon after connecting (the interval handler only
   // fires every 15 s). Delayed so it cannot race the SET_INTERFACE above.
-  if (this->status_polling_enabled_) {
-    this->set_timeout("printer_status_first", 2000, [this]() {
-      if (this->is_ready())
-        this->printer_class_port_status_();
-    });
-  }
+  this->set_timeout("printer_status_first", 2000, [this]() {
+    if (this->is_ready())
+      this->printer_class_port_status_();
+  });
 
-  // Read the page count once the interface has settled (HP PJL only).
-  if (this->page_count_enabled_) {
-    this->set_timeout("page_count_first", 4000, [this]() {
-      if (this->is_ready() && this->query_page_count_())
-        this->last_page_count_query_ = millis();
-    });
-  }
+  // Read the page count once the interface has settled.
+  this->set_timeout("page_count_first", 4000, [this]() {
+    if (this->is_ready() && this->query_page_count_())
+      this->last_page_count_query_ = millis();
+  });
 }
 
 void HP1010PrintServer::on_disconnected() {

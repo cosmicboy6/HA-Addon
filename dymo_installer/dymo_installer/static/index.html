@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DYMO LabelWriter 450 Installer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>DYMO LabelWriter 450 Installer</h1>
+  <p class="muted">Build and flash the ESP32-S3 firmware for the DYMO LabelWriter 450 print server.</p>
+  <p class="muted small" id="versions"></p>
+</header>
+
+<section class="card">
+  <h2><span class="step">1</span> Settings</h2>
+  <p class="muted small">These values are written into the device firmware. Your WiFi password stays on this
+     Home Assistant instance (<code>/data</code>) and is never uploaded anywhere.</p>
+  <div class="grid">
+    <label>WiFi SSID
+      <input id="wifi_ssid" type="text" autocomplete="off" placeholder="Your 2.4 GHz network">
+    </label>
+    <label>WiFi password
+      <input id="wifi_password" type="password" autocomplete="new-password">
+    </label>
+    <label>Fallback AP name
+      <input id="ap_ssid" type="text" autocomplete="off">
+    </label>
+    <label>Fallback AP password (min 8 chars)
+      <input id="ap_password" type="text" autocomplete="off">
+    </label>
+    <label class="wide">API encryption key
+      <div class="row">
+        <input id="api_key" type="text" autocomplete="off">
+        <button class="secondary" id="gen-key" type="button">Generate</button>
+      </div>
+    </label>
+  </div>
+  <div class="actions">
+    <button id="save" type="button">Save settings</button>
+    <span class="muted small" id="save-msg"></span>
+  </div>
+</section>
+
+<section class="card">
+  <h2><span class="step">2</span> Build firmware</h2>
+  <p class="muted small">Compiles the firmware with your settings. The first build downloads the ESP32
+     toolchain and can take several minutes; later builds are much faster (cached in <code>/data</code>).</p>
+  <div class="actions">
+    <button id="build" type="button">Build firmware</button>
+    <span class="muted small" id="build-msg"></span>
+  </div>
+</section>
+
+<section class="card">
+  <h2><span class="step">3</span> Flash over USB</h2>
+  <p class="muted small">Plug the ESP32-S3 into the Home Assistant host with a <strong>data</strong> USB cable.
+     Select the port, then flash the firmware you just built.</p>
+  <div class="grid">
+    <label>Serial port
+      <div class="row">
+        <select id="device_port"></select>
+        <button class="secondary" id="refresh-ports" type="button">Refresh</button>
+      </div>
+    </label>
+  </div>
+  <div class="actions">
+    <button id="flash" type="button">Flash built firmware</button>
+    <span class="muted small" id="flash-msg"></span>
+  </div>
+  <div class="actions">
+    <button class="secondary" id="quickflash" type="button">Flash bundled prebuilt image</button>
+    <span class="muted small" id="quickflash-msg"></span>
+    <button class="danger" id="cancel" type="button" hidden>Cancel job</button>
+  </div>
+  <p class="muted small">The bundled prebuilt image needs no build: it boots a
+     <strong>DYMO Print Fallback</strong> access point so you can set the WiFi later. Use the normal
+     flash once you have built your own firmware.</p>
+</section>
+
+<section class="card">
+  <h2>Log</h2>
+  <div class="actions">
+    <button class="secondary" id="clear-log" type="button">Clear view</button>
+    <span class="muted small" id="job-msg"></span>
+  </div>
+  <pre id="log" aria-live="polite"></pre>
+</section>
+
+<footer class="muted small">
+  DYMO LabelWriter 450 Installer &middot; <span id="app-version"></span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

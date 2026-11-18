@@ -1,0 +1,18 @@
+#!/command/with-contenv bashio
+# DYMO LabelWriter 450 Installer - s6 longrun service.
+
+# Keep every large download (platformio packages, ESP-IDF, build cache) on the
+# persistent /data volume, so only the first build pays the download cost.
+export HOME=/data
+export PLATFORMIO_CORE_DIR=/data/platformio
+export PLATFORMIO_PLATFORMS_DIR=/data/platformio/platforms
+export PLATFORMIO_PACKAGES_DIR=/data/platformio/packages
+export PLATFORMIO_CACHE_DIR=/data/platformio/cache
+export ESPHOME_ESP_IDF_PREFIX=/data/idf
+export ESPHOME_SDK_NRF_PREFIX=/data/sdk-nrf
+export ESPHOME_ARDUINO8266_PREFIX=/data/arduino8266
+export ESPHOME_HOST_PREFIX=/data/host
+export ESPHOME_PLATFORMIO_CCACHE_DIR=/data/platformio-ccache
+export PYTHONUNBUFFERED=1
+
+exec python3 /opt/dymo_installer/server.py
