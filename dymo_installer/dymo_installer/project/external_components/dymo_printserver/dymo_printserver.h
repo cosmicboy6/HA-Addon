@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -52,6 +53,13 @@ class DymoPrintServer : public usb_host::USBClient {
   /// Selected / online (status bit 4 "Select").
   bool is_online() const { return this->is_ready() && (this->printer_status() & STATUS_SELECT) != 0; }
 
+  /// Render one line of text into a DYMO ESC/P raster label and submit it to the
+  /// local raw-9100 pipeline. The line is drawn in the large DejaVuSans-Bold face
+  /// (the font of the sample label) and centred vertically on the label; a line
+  /// wider than the label is scaled down to fit. Returns false when the printer
+  /// is not ready or the job could not be handed off to the print server.
+  bool print_label(const std::string &line);
+
  protected:
   void on_connected() override;
   void on_disconnected() override;
@@ -87,6 +95,8 @@ class DymoPrintServer : public usb_host::USBClient {
   static void tcp_task_entry_(void *arg);
   void tcp_task_();
   void handle_client_(int fd);
+  /// Send a finished byte stream to the local raw-9100 listener (127.0.0.1).
+  bool send_raw_(const uint8_t *data, size_t len);
   void start_output_();
   void start_input_();
   static void out_transfer_cb_(usb_transfer_t *xfer);

@@ -1,8 +1,12 @@
 #include "dymo_printserver.h"
 
+#include "dymo_label_font.h"
+
 #include <cerrno>
 #include <cstring>
 #include <new>
+#include <string>
+#include <vector>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -10,6 +14,10 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+
+#ifdef USE_WEBSERVER
+#include "esphome/components/web_server_base/web_server_base.h"
+#endif
 
 namespace esphome::dymo_printserver {
 
@@ -27,6 +35,242 @@ static constexpr uint8_t DYMO_DESC_ENDPOINT = 0x05;
 static constexpr uint8_t DYMO_XFER_TYPE_MASK = 0x03;
 static constexpr uint8_t DYMO_XFER_TYPE_BULK = 0x02;
 
+// ---------------------------------------------------------------------------
+// Label rendering
+//
+// The LabelWriter 450 is a 300 dpi 672-dot wide device; the raster commands are
+// "ESC D <bytes/line>" followed by one "SYN" + raster-line pair per scan line
+// and a trailing "ESC E" form feed. Lines are drawn into a 1-bit framebuffer
+// (MSB = leftmost dot) from the pre-rendered DejaVuSans-Bold glyphs in
+// dymo_label_font.h, then framed into that stream.
+// ---------------------------------------------------------------------------
+namespace {
+
+constexpr int LABEL_W = 672;              // printable dots across a label
+constexpr int LABEL_H = 240;              // scan lines per label
+constexpr int LABEL_STRIDE = LABEL_W / 8;  // 84 bytes per raster line
+
+// Decode the next UTF-8 code point and advance `i`. Invalid sequences yield
+// U+FFFD and advance a single byte so the loop always makes progress.
+uint32_t utf8_next(const std::string &s, size_t &i) {
+  const uint8_t c = static_cast<uint8_t>(s[i]);
+  auto cont = [&](size_t k) { return i + k < s.size() && (static_cast<uint8_t>(s[i + k]) & 0xC0) == 0x80; };
+  if (c < 0x80) {
+    i += 1;
+    return c;
+  }
+  if ((c & 0xE0) == 0xC0 && cont(1)) {
+    const uint32_t cp = ((c & 0x1F) << 6) | (static_cast<uint8_t>(s[i + 1]) & 0x3F);
+    i += 2;
+    return cp;
+  }
+  if ((c & 0xF0) == 0xE0 && cont(1) && cont(2)) {
+    const uint32_t cp =
+        ((c & 0x0F) << 12) | ((static_cast<uint8_t>(s[i + 1]) & 0x3F) << 6) | (static_cast<uint8_t>(s[i + 2]) & 0x3F);
+    i += 3;
+    return cp;
+  }
+  if ((c & 0xF8) == 0xF0 && cont(1) && cont(2) && cont(3)) {
+    const uint32_t cp = ((c & 0x07) << 18) | ((static_cast<uint8_t>(s[i + 1]) & 0x3F) << 12) |
+                        ((static_cast<uint8_t>(s[i + 2]) & 0x3F) << 6) | (static_cast<uint8_t>(s[i + 3]) & 0x3F);
+    i += 4;
+    return cp;
+  }
+  i += 1;
+  return 0xFFFD;
+}
+
+// Look up a code point's glyph; nullptr when the font has no bitmap for it.
+const LabelGlyph *lookup_glyph(const LabelFont &font, uint32_t cp) {
+  if (cp >= 256)
+    return nullptr;
+  const uint8_t slot = font.index[cp];
+  if (slot == 0xFF)
+    return nullptr;
+  return &font.glyphs[slot];
+}
+
+int text_width(const LabelFont &font, const std::vector<uint32_t> &cps) {
+  int width = 0;
+  for (uint32_t cp : cps) {
+    if (const LabelGlyph *g = lookup_glyph(font, cp))
+      width += g->adv;
+  }
+  return width;
+}
+
+// Blit one centered line with its ascender line at `top_y`. When the text is
+// wider than the label it is scaled down (nearest-neighbour) just enough to fit,
+// so a line at its maximum length is never clipped at the edge. Short lines are
+// drawn at the font's native size, byte for byte as before.
+void draw_line(uint8_t *fb, const LabelFont &font, const std::string &text, int top_y) {
+  std::vector<uint32_t> cps;
+  cps.reserve(text.size());
+  for (size_t i = 0; i < text.size();)
+    cps.push_back(utf8_next(text, i));
+
+  const int width = text_width(font, cps);
+  if (width <= 0)
+    return;
+
+  // Fixed-point scale where 1024 == 1.0; only ever shrink, never enlarge.
+  int scale = 1024;
+  if (width > LABEL_W)
+    scale = static_cast<int>(static_cast<int64_t>(LABEL_W) * 1024 / width);
+
+  const int baseline = top_y + font.ascent * scale / 1024;
+  int x = (LABEL_W - width * scale / 1024) / 2;
+  for (uint32_t cp : cps) {
+    const LabelGlyph *g = lookup_glyph(font, cp);
+    if (g == nullptr)
+      continue;
+    if (g->w > 0 && g->h > 0) {
+      const int glyph_stride = (g->w + 7) / 8;
+      const uint8_t *bits = font.bits + g->off;
+      const int dw = g->w * scale / 1024 > 0 ? g->w * scale / 1024 : 1;
+      const int dh = g->h * scale / 1024 > 0 ? g->h * scale / 1024 : 1;
+      const int left = g->left * scale / 1024;
+      const int top = g->top * scale / 1024;
+      for (int dy = 0; dy < dh; dy++) {
+        const int py = baseline + top + dy;
+        if (py < 0 || py >= LABEL_H)
+          continue;
+        const uint8_t *row = bits + (dy * 1024 / scale) * glyph_stride;
+        for (int dx = 0; dx < dw; dx++) {
+          const int sx = dx * 1024 / scale;
+          if ((row[sx >> 3] & (0x80 >> (sx & 7))) == 0)
+            continue;
+          const int px = x + left + dx;
+          if (px < 0 || px >= LABEL_W)
+            continue;
+          fb[py * LABEL_STRIDE + (px >> 3)] |= 0x80 >> (px & 7);
+        }
+      }
+    }
+    x += g->adv * scale / 1024;
+  }
+}
+
+// Frame the framebuffer as a DYMO ESC/P raster job.
+void build_escp(const uint8_t *fb, std::vector<uint8_t> &out) {
+  out.clear();
+  out.reserve(static_cast<size_t>(LABEL_H) * (LABEL_STRIDE + 1) + 8);
+  out.push_back(0x1B);  // ESC @ - reset
+  out.push_back(0x40);
+  out.push_back(0x1B);  // ESC D - set bytes per line
+  out.push_back(0x44);
+  out.push_back(LABEL_STRIDE);
+  for (int y = 0; y < LABEL_H; y++) {
+    out.push_back(0x16);  // SYN - start a raster line
+    out.insert(out.end(), fb + y * LABEL_STRIDE, fb + (y + 1) * LABEL_STRIDE);
+  }
+  out.push_back(0x1B);  // ESC E - form feed (print and feed the label)
+  out.push_back(0x45);
+}
+
+#ifdef USE_WEBSERVER
+const char *const LABEL_FORM_HEAD =
+    "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+    "<title>DYMO LabelWriter 450</title><style>"
+    ":root{color-scheme:light dark}"
+    "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:1.5rem;max-width:34rem;line-height:1.35}"
+    "h1{font-size:1.3rem;margin:0 0 .3rem}"
+    "p.sub{margin:0 0 1.1rem;opacity:.72;font-size:.85rem}"
+    "p.ok,p.err{padding:.6rem .8rem;border-radius:.5rem;font-size:.9rem;margin:0 0 1rem}"
+    "p.ok{background:#1f7a3d;color:#fff}p.err{background:#a12b2b;color:#fff}"
+    "form{display:grid;gap:.55rem}"
+    "label{font-size:.8rem;opacity:.8}"
+    "input{font-size:1.05rem;padding:.55rem .6rem;width:100%;box-sizing:border-box;border-radius:.4rem;border:1px solid #888}"
+    "button{margin-top:.4rem;font-size:1.05rem;font-weight:700;padding:.8rem;cursor:pointer;border-radius:.5rem;border:0;background:#1f6feb;color:#fff}"
+    "</style></head><body>";
+
+void append_html_escaped(std::string &out, const std::string &s) {
+  for (char c : s) {
+    switch (c) {
+      case '&': out += "&amp;"; break;
+      case '<': out += "&lt;"; break;
+      case '>': out += "&gt;"; break;
+      case '"': out += "&quot;"; break;
+      case '\'': out += "&#39;"; break;
+      default: out += c; break;
+    }
+  }
+}
+
+std::string make_field(const char *name, const char *label, int max_length, const std::string &value,
+                       const char *placeholder) {
+  std::string out = "<label for=\"";
+  out += name;
+  out += "\">";
+  out += label;
+  out += "</label><input id=\"";
+  out += name;
+  out += "\" name=\"";
+  out += name;
+  out += "\" maxlength=\"";
+  out += std::to_string(max_length);
+  out += "\" autocomplete=\"off\" placeholder=\"";
+  append_html_escaped(out, placeholder);
+  out += "\" value=\"";
+  append_html_escaped(out, value);
+  out += "\">";
+  return out;
+}
+
+// Serves GET /print (the form) and POST /print (render + print the label).
+class DymoLabelWebHandler : public web_server_idf::AsyncWebHandler {
+ public:
+  explicit DymoLabelWebHandler(DymoPrintServer *server) : server_(server) {}
+
+  bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override {
+    char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+    if (request->url_to(url_buf) != "/print")
+      return false;
+    const auto method = request->method();
+    return method == HTTP_GET || method == HTTP_POST;
+  }
+
+  void handleRequest(web_server_idf::AsyncWebServerRequest *request) override {
+    const bool is_post = request->method() == HTTP_POST;
+
+    // GET starts with an empty form; only a POST carries a value. Nothing is
+    // pre-filled, so opening or reloading the page can never print a label.
+    std::string line;
+    if (is_post)
+      line = request->arg("line1");
+
+    std::string html = LABEL_FORM_HEAD;
+    html += "<h1>DYMO LabelWriter 450</h1>"
+            "<p class=\"sub\">One line in DejaVu Sans Bold, the same font as the test label. "
+            "It is drawn large (up to 20 characters) and centred on the label; a line that is "
+            "still too wide is scaled down to fit.</p>";
+
+    if (is_post) {
+      if (line.empty()) {
+        html += "<p class=\"err\">Enter some text before printing.</p>";
+      } else if (this->server_->print_label(line)) {
+        html += "<p class=\"ok\">Label sent to the printer.</p>";
+      } else {
+        html += "<p class=\"err\">Printer not ready &mdash; the label was not printed.</p>";
+      }
+    }
+
+    html += "<form method=\"post\" action=\"/print\">";
+    html += make_field("line1", "Line 1 (large, max 20)", 20, line, "DYMO 450");
+    html += "<button type=\"submit\">Print label</button></form></body></html>";
+
+    request->send(200, "text/html", html.c_str());
+  }
+
+ private:
+  DymoPrintServer *server_;
+};
+#endif  // USE_WEBSERVER
+
+}  // namespace
+
+
 void DymoPrintServer::loop() {
   if (!this->tcp_started_) {
     this->tcp_started_ = true;
@@ -43,6 +287,19 @@ void DymoPrintServer::loop() {
 
 void DymoPrintServer::setup() {
   usb_host::USBClient::setup();
+
+#ifdef USE_WEBSERVER
+  // Expose the /print label form on the ESPHome web server. The base pointer is
+  // assigned in generated setup() before any component setup() runs, and the
+  // handler is registered whether the listener already exists or not.
+  if (web_server_base::global_web_server_base != nullptr) {
+    web_server_base::global_web_server_base->add_handler(new DymoLabelWebHandler(this));
+    ESP_LOGI(TAG, "Label form available at http://<host>/print");
+  } else {
+    ESP_LOGW(TAG, "No web server found; /print label form disabled");
+  }
+#endif
+
   if (this->is_failed())
     return;
 
@@ -567,6 +824,67 @@ void DymoPrintServer::handle_client_(int fd) {
   const bool drain_timeout = (uxQueueMessagesWaiting(this->ready_queue_) > 0 || this->inflight_.load(std::memory_order_acquire) > 0);
   ESP_LOGI(TAG, "Job done: received %u bytes over TCP, forwarded %u bytes to USB%s", static_cast<unsigned>(recv_total),
            static_cast<unsigned>(this->out_bytes_.load(std::memory_order_relaxed)), drain_timeout ? " (DRAIN TIMEOUT)" : "");
+}
+
+bool DymoPrintServer::print_label(const std::string &line) {
+  if (!this->is_ready()) {
+    ESP_LOGW(TAG, "Label requested but printer is not ready");
+    return false;
+  }
+
+  // 1-bit framebuffer, MSB = leftmost dot, one 84-byte stride per scan line.
+  std::vector<uint8_t> fb(static_cast<size_t>(LABEL_STRIDE) * LABEL_H, 0);
+  // One large line, centred vertically: the big face is 52+14 dots tall, so its
+  // ascender line sits at (240 - 66) / 2 = 87.
+  draw_line(fb.data(), LABEL_FONT_BIG, line, (LABEL_H - (LABEL_FONT_BIG.ascent + LABEL_FONT_BIG.descent)) / 2);
+
+  std::vector<uint8_t> job;
+  build_escp(fb.data(), job);
+  ESP_LOGI(TAG, "Rendering label (%u bytes): \"%s\"", static_cast<unsigned>(job.size()), line.c_str());
+  return this->send_raw_(job.data(), job.size());
+}
+
+// Hand a finished job to the raw-9100 listener on the loopback interface so it
+// travels through exactly the same USB path as a network client's job.
+bool DymoPrintServer::send_raw_(const uint8_t *data, size_t len) {
+  if (data == nullptr || len == 0)
+    return false;
+
+  const int fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) {
+    ESP_LOGE(TAG, "socket() failed: %d", errno);
+    return false;
+  }
+
+  struct timeval send_timeout {};
+  send_timeout.tv_sec = 10;
+  setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
+
+  struct sockaddr_in addr {};
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  addr.sin_port = htons(this->port_);
+  if (connect(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) < 0) {
+    ESP_LOGE(TAG, "connect(127.0.0.1:%u) failed: %d", this->port_, errno);
+    close(fd);
+    return false;
+  }
+
+  size_t sent = 0;
+  while (sent < len) {
+    const int n = send(fd, data + sent, len - sent, 0);
+    if (n <= 0) {
+      ESP_LOGW(TAG, "send failed after %u/%u bytes: %d", static_cast<unsigned>(sent), static_cast<unsigned>(len), errno);
+      break;
+    }
+    sent += static_cast<size_t>(n);
+  }
+
+  shutdown(fd, SHUT_WR);
+  close(fd);
+  ESP_LOGI(TAG, "Label job handed to local print server (%u/%u bytes)", static_cast<unsigned>(sent),
+           static_cast<unsigned>(len));
+  return sent == len;
 }
 
 }  // namespace esphome::dymo_printserver
