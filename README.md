@@ -1,5 +1,7 @@
 # Home Assistant Add-ons
 
+[![Sponsor this project](https://img.shields.io/badge/Sponsor%20this%20project-FFDD00?style=flat-square&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/hanshauberger)
+
 ## About
 
 Home Assistant lets anyone publish a repository of add-ons. This repository
